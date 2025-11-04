@@ -1,18 +1,128 @@
-#This is the running effort for the document.
-#I'm still trying to get this platform figured out, so feel free to do it first. 
+# This is the running effort for the document.
+# print("Hello Group2")
+# print("Welcome To Wk4")
 
-print("Hello Group2")
-print("Welcome To Wk1")
+# To run this code access terminal from the menu in GitHub.
+# To do this first click on "Code Spaces" in the Navigation Bar
+# Add you edits there.
+# In the GitHub Termanl type: python3 Group2_Code.py
+# This is the difficult part:
+# to save your changes to GitHub you will need to use the following commands:
+# git add .
+# git commit -m "Your Message Here"
+# git push
 
-#To run this code access terminal from the menu in GitHub.
-#So you need to use the CodeSpaces.
-#So exit out of this file and click the Green Button on the Navigation Bar
-#
-#In the GitHub Termanl, to run the code type: 
-#Python3 Group2_Code.py
-#
-#This is the difficult part:
-#to save your changes to GitHub you will need to use the following commands:
-#git add .
-#git commit -m "Your Message Here"
-#git push
+from __future__ import annotations
+
+import csv, os
+from math import prod
+from datetime import datetime
+
+JOURNAL = "journal.csv"
+
+
+def parse_prob(s: str) -> float:
+    """
+    Parse user input probability into a float in [0, 1].
+
+    Accepts:
+      - Decimal form: '0.7'
+      - Percent form: '70%'
+
+    Raises:
+      ValueError if not a number or outside [0, 1].
+    """
+
+    s = s.strip()
+    is_pct = s.endswith("%")
+    if is_pct:
+        s = s[:-1]
+
+    p = float(s)
+    if is_pct:
+        p /= 100.0
+
+    if not (0.0 <= p <= 1.0):
+        raise ValueError("Probability must be 0–1.")
+
+    return p
+
+
+def save_row(path: str, row: dict) -> None:
+    """
+    Append one entry (timestamp, character, probability) to the CSV.
+    Writes a header row automatically if the file doesn’t exist yet.
+    """
+    header = ["timestamp", "character", "probability"]
+    write_header = not os.path.exists(path)
+
+    with open(path, "a", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=header)
+        if write_header:
+            w.writeheader()
+        w.writerow(row)
+
+
+def load_rows(path: str, character: str) -> list[dict]:
+    """
+    Read all rows for the given character from the CSV.
+    Returns [] if file doesn’t exist yet (first run).
+    """
+    if not os.path.exists(path):
+        return []
+    with open(path, newline="") as f:
+        return [r for r in csv.DictReader(f) if r["character"] == character]
+
+
+def total_survival(rows: list[dict]) -> float:
+    """
+    Compute the cumulative survival as the product of probabilities.
+    If no rows yet, return 1.0 (neutral element for multiplication).
+    """
+    return prod(float(r["probability"]) for r in rows) if rows else 1.0
+
+
+def main():
+
+    print("Welcome to Group 2 MVP")
+
+    # Ask for a character name; removes leading/trailing spaces.
+    characterName = input("Enter Character Name: ").strip()
+
+    while True:
+        raw = input("Enter Probability (e.g., 0.7 or 70%): ").strip()
+        try:
+            p = parse_prob(raw)
+            break
+        except ValueError as e:
+            # Print the same friendly message for both parse and range errors.
+            print(f"Invalid. Enter 0.00–1.00 or 0–100%. ({e})")
+
+    # Timestamp the entry (use seconds precision; ISO sorts lexicographically).
+    ts = datetime.now().isoformat(timespec="seconds")
+
+    # Save the single row to the CSV "journal".
+    save_row(
+        JOURNAL,
+        {
+            "timestamp": ts,
+            "character": characterName,
+            "probability": f"{p:.6f}",  # keep more precision in storage
+        },
+    )
+
+    # Load all rows for this character and compute the cumulative product.
+    rows = load_rows(JOURNAL, characterName)
+    cumulative = total_survival(rows)
+
+    print("\n--- Entry Recorded ---")
+    print(f"time:      {ts}")
+    print(f"name:      {characterName}")
+    print(f"p (0–1):   {p:.3f}")
+    print(f"overall:   {cumulative:.3f}")  # e.g., 0.8×0.7×0.5 = 0.28
+    print("----------------------")
+    print("Tip: Add two more entries (0.8, 0.7, 0.5) to see overall ≈ 0.28.")
+
+
+if __name__ == "__main__":
+    main()

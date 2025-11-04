@@ -12,13 +12,34 @@
 # git commit -m "Your Message Here"
 # git push
 
+# ── Group2_Code.py — Encrypted Probability Journal (CLI) ──
+# Logs encounters with a success probability, stores history as CSV text,
+# and keeps it encrypted on disk (journal.enc) using a password.
+#
+# Quick start:
+# 1) (Recommended) Create a venv:
+#      python -m venv .venv
+#      # Activate:  .venv\Scripts\activate  (Windows)
+#      #            source .venv/bin/activate (macOS/Linux)
+# 2) Install deps:  pip install -r requirements.txt
+# 3) Run:           python Group2_Code.py
+#    - First run: set a password (creates a new encrypted journal).
+#    - Later runs: enter the same password to decrypt and continue.
+
+
 from __future__ import annotations
 
-import csv, os
+import csv, os, json, base64, getpass
+from dataclasses import dataclass
 from math import prod
 from datetime import datetime
+from io import StringIO
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC  # key derivation
+from cryptography.hazmat.primitives import hashes
 
-JOURNAL = "journal.csv"
+JOURNAL_ENC = "journal.enc"
+CSV_HEADER = ["timestamp", "character", "probability", "algo", "note"]
 
 
 def parse_prob(s: str) -> float:
@@ -48,30 +69,51 @@ def parse_prob(s: str) -> float:
     return p
 
 
-def save_row(path: str, row: dict) -> None:
+def load_csv_from_encrypted(password: str) -> list[dict]:
     """
-    Append one entry (timestamp, character, probability) to the CSV.
-    Writes a header row automatically if the file doesn’t exist yet.
-    """
-    header = ["timestamp", "character", "probability"]
-    write_header = not os.path.exists(path)
+    Read the encrypted journal from JOURNAL_ENC using the given password.
 
-    with open(path, "a", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=header)
-        if write_header:
-            w.writeheader()
-        w.writerow(row)
+    Flow:
+      1) Read JSON blob {salt, ciphertext}.
+      2) Derive key from password+salt (PBKDF2).
+      3) Decrypt with Fernet (verifies integrity).
+      4) Parse CSV text into a list of dict rows.
 
-
-def load_rows(path: str, character: str) -> list[dict]:
+    Returns [] on first run (no file).
     """
-    Read all rows for the given character from the CSV.
-    Returns [] if file doesn’t exist yet (first run).
-    """
-    if not os.path.exists(path):
+    if not os.path.exists(JOURNAL_ENC):
         return []
-    with open(path, newline="") as f:
-        return [r for r in csv.DictReader(f) if r["character"] == character]
+    with open(JOURNAL_ENC, "r", encoding="utf-8") as f:
+        blob = json.load(f)
+    plaintext = _decrypt_bytes(password, blob).decode("utf-8")
+    return list(csv.DictReader(plaintext.splitlines()))
+
+
+def save_csv_to_encrypted(password: str, rows: list[dict]) -> None:
+    """
+    Serialize rows → CSV text → encrypt → write JOURNAL_ENC.
+
+    Using authenticated encryption (Fernet) ensures the file cannot be
+    modified without detection and keeps the contents confidential.
+    """
+    sio = StringIO()
+    writer = csv.DictWriter(sio, fieldnames=CSV_HEADER)
+    writer.writeheader()
+    for r in rows:
+        writer.writerow(r)
+    plaintext = sio.getvalue().encode("utf-8")
+    blob = _encrypt_bytes(password, plaintext)
+    with open(JOURNAL_ENC, "w", encoding="utf-8") as f:
+        json.dump(blob, f)
+
+
+def cumulative_for_character(rows: list[dict], name: str) -> float:
+    """
+    Compute product of probabilities for the specified character
+    using ONLY the persisted (decrypted) rows.
+    """
+    vals = [float(r["probability"]) for r in rows if r["character"] == name]
+    return prod(vals) if vals else 1.0
 
 
 def total_survival(rows: list[dict]) -> float:
@@ -82,12 +124,116 @@ def total_survival(rows: list[dict]) -> float:
     return prod(float(r["probability"]) for r in rows) if rows else 1.0
 
 
-def main():
+def _derive_key(password: str, salt: bytes) -> bytes:
+    """
+    Derive a 32-byte key from a human password using PBKDF2-HMAC-SHA256.
+    - salt: 16 bytes random per journal file
+    - iterations: 200k (good classroom default)
+    Returns a base64-url key suitable for Fernet.
+    """
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(), length=32, salt=salt, iterations=200_000
+    )
+    return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
+
+def _encrypt_bytes(password: str, plaintext: bytes, salt: bytes | None = None) -> dict:
+    """
+    Encrypt arbitrary bytes with a password.
+    Returns a JSON-serializable dict: {'salt': b64, 'ciphertext': b64}.
+    """
+    salt = os.urandom(16) if salt is None else salt
+    key = _derive_key(password, salt)
+    token = Fernet(key).encrypt(plaintext)
+    return {
+        "salt": base64.b64encode(salt).decode(),
+        "ciphertext": base64.b64encode(token).decode(),
+    }
+
+
+def _decrypt_bytes(password: str, blob: dict) -> bytes:
+    """
+    Reverse of _encrypt_bytes. Raises if password is wrong or data is tampered.
+    """
+    salt = base64.b64decode(blob["salt"])
+    token = base64.b64decode(blob["ciphertext"])
+    key = _derive_key(password, salt)
+    return Fernet(key).decrypt(token)
+
+
+def collect_user_profile() -> UserProfile:
+    """
+    One-time prompt when the journal is empty.
+    Stores minimal user metadata as a 'meta' row inside the encrypted file.
+    """
+    name = input("Profile name (press Enter to reuse character name later): ").strip()
+    location = input("Location (optional): ").strip()
+    email = input("Contact email (optional): ").strip()
+    return UserProfile(name=name or "", location=location, email=email)
+
+
+@dataclass
+class Encounter:
+    """
+    Represents one logged encounter.
+    - timestamp: ISO 8601 string
+    - character: which character the encounter belongs to
+    - probability: success probability (0–1) after any algorithm transform
+    - algo: algorithm name used to compute the stored probability
+    """
+
+    timestamp: str
+    character: str
+    probability: float
+    algo: str = "basic"
+    note: str = ""
+
+
+@dataclass
+class UserProfile:
+    name: str
+    location: str = ""
+    email: str = ""
+
+
+def main():
+    """
+    Interactive flow:
+      1) Ask for password and open (decrypt) the journal.
+      2) If new journal, collect a minimal user profile (encrypted meta row).
+      3) Prompt for character and probability.
+      4) Append encounter to in-memory rows.
+      5) Re-encrypt and save; compute cumulative total from FILE rows.
+      6) Print a short summary.
+    """
     print("Welcome to Group 2 MVP")
 
-    # Ask for a character name; removes leading/trailing spaces.
-    characterName = input("Enter Character Name: ").strip()
+    password = getpass.getpass("Enter journal password: ").strip()
+    try:
+        rows = load_csv_from_encrypted(password)
+    except Exception:
+        print("Error: could not decrypt journal. Wrong password or corrupt file.")
+        return
+
+    if not rows:
+        print("No prior entries found. (New journal)")
+        profile = collect_user_profile()
+        # store profile as a synthetic row with note (keeps CSV simple)
+        rows.append(
+            {
+                "timestamp": datetime.now().isoformat(timespec="seconds"),
+                "character": profile.name or "default",
+                "probability": "1.0",
+                "algo": "meta",
+                "note": f"profile|location={profile.location}|email={profile.email}",
+            }
+        )
+
+    while True:
+        character_name = input("Enter Character Name: ").strip()
+        if character_name:
+            break
+        print("Please enter a non-empty name.")
 
     while True:
         raw = input("Enter Probability (e.g., 0.7 or 70%): ").strip()
@@ -95,33 +241,34 @@ def main():
             p = parse_prob(raw)
             break
         except ValueError as e:
-            # Print the same friendly message for both parse and range errors.
             print(f"Invalid. Enter 0.00–1.00 or 0–100%. ({e})")
 
-    # Timestamp the entry (use seconds precision; ISO sorts lexicographically).
-    ts = datetime.now().isoformat(timespec="seconds")
-
-    # Save the single row to the CSV "journal".
-    save_row(
-        JOURNAL,
+    enc = Encounter(
+        timestamp=datetime.now().isoformat(timespec="seconds"),
+        character=character_name,
+        probability=p,
+        algo="basic",
+        note="",
+    )
+    rows.append(
         {
-            "timestamp": ts,
-            "character": characterName,
-            "probability": f"{p:.6f}",  # keep more precision in storage
-        },
+            "timestamp": enc.timestamp,
+            "character": enc.character,
+            "probability": f"{enc.probability:.6f}",
+            "algo": enc.algo,
+            "note": enc.note,
+        }
     )
 
-    # Load all rows for this character and compute the cumulative product.
-    rows = load_rows(JOURNAL, characterName)
-    cumulative = total_survival(rows)
+    save_csv_to_encrypted(password, rows)
+    cumulative = cumulative_for_character(rows, character_name)
 
-    print("\n--- Entry Recorded ---")
-    print(f"time:      {ts}")
-    print(f"name:      {characterName}")
+    # 5) Output
+    print("\n--- Entry Recorded (encrypted) ---")
+    print(f"time:      {enc.timestamp}")
+    print(f"name:      {character_name}")
     print(f"p (0–1):   {p:.3f}")
-    print(f"overall:   {cumulative:.3f}")  # e.g., 0.8×0.7×0.5 = 0.28
-    print("----------------------")
-    print("Tip: Add two more entries (0.8, 0.7, 0.5) to see overall ≈ 0.28.")
+    print(f"overall:   {cumulative:.3f}")
 
 
 if __name__ == "__main__":

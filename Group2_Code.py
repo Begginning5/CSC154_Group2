@@ -5,16 +5,17 @@
 # To run this code access terminal from the menu in GitHub.
 # To do this first click on "Code Spaces" in the Navigation Bar
 # Add you edits there.
-# In the GitHub Termanl type: Python3 Group2_Code.py
+# In the GitHub Termanl type: python3 Group2_Code.py
 # This is the difficult part:
 # to save your changes to GitHub you will need to use the following commands:
 # git add .
 # git commit -m "Your Message Here"
 # git push
 
+from __future__ import annotations
+
 import csv, os
 from math import prod
-from __future__ import annotations
 from datetime import datetime
 
 JOURNAL = "journal.csv"

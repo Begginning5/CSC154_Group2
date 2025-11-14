@@ -393,7 +393,7 @@ def main() -> None:
                 input("Encounter name (e.g., bear attack): ").strip() or "unspecified"
             )
             while True:
-                raw = input("Probability (0.7 or 70%): ").strip()
+                raw = input("Enter probability of surviving encounter (between 0 and 1, or 0%-100%):  ").strip()
                 try:
                     p = parse_prob(raw)
                     break

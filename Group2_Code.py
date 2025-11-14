@@ -119,6 +119,13 @@ def cumulative_for_character(rows: list[dict], name: str) -> float:
     Compute product of probabilities for the specified character
     using ONLY the persisted (decrypted) rows.
     """
+    # PROBLEM 1 - This function calculates the probability that the character is still alive after all encounter
+    # probabilities are multiplied together. This means that the probability shrinks smaller toward 0 with each encounter.
+    # So in its current form, the "probability" left over functions more like an HP bar than a probability score.
+    # To align the program with the user stories, the code should be able to:
+    # 1) Calculate the survival probability of a specific type of encounter
+    # 2) Provide a basic choice for the user to decide between different options or strategies
+    # 3) Show the survival % (HP) that the character has remaining afterward (this will be the new use of the current 'probability score' function)
     vals = [float(r["probability"]) for r in rows if r["character"] == name]
     return prod(vals) if vals else 1.0
 

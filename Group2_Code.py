@@ -201,8 +201,10 @@ def avg_prob_for_type(rows: list[dict], encounter_type: str):
         and r.get("algo") != "meta"
     ]
     if not probs:
-        return None
-    return sum(probs) / len(probs)
+        return None, 0
+
+    avg = sum(probs) / len(probs)
+    return avg, len(probs)
 
 def clear_character(rows: list[dict], name: str) -> int:
     """

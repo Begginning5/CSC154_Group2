@@ -494,7 +494,7 @@ def main() -> None:
             print(f"Entry saved. Probability = {final_prob*100:.1f}%.")
 
             # Recalculate HP for this character
-            hp = cumulative_for_characters(rows, name)
+            hp = cumulative_for_character(rows, name)
             # Print updated HP bar
             print(f"{name.upper():10} {hp_bar(hp)}")
 

@@ -493,6 +493,11 @@ def main() -> None:
             save_csv_to_encrypted(password, rows)
             print(f"Entry saved. Probability = {final_prob*100:.1f}%.")
 
+            # Recalculate HP for this character
+            hp = cumulative_for_characters(rows, name)
+            # Print updated HP bar
+            print(f"{name.upper():10} {hp_bar(hp)}")
+
         elif choice == "e": # List known encounter types
             list_encounter_types(rows)
             

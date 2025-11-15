@@ -37,6 +37,7 @@
 from __future__ import annotations
 
 import csv, os, json, base64, getpass
+import random #for probability calculation
 from dataclasses import dataclass
 from math import prod
 from datetime import datetime
@@ -47,7 +48,6 @@ from cryptography.hazmat.primitives import hashes
 
 JOURNAL_ENC = "journal.enc"
 CSV_HEADER = ["timestamp", "character", "encounter", "probability", "algo", "note"]
-
 
 def parse_prob(s: str) -> float:
     """
@@ -180,7 +180,7 @@ def print_history(rows: list[dict], name: str) -> None:
     hp = cumulative_for_character(rows, name)
     print(f"{name.upper():10} {hp_bar(hp)}")
 
-# Lists known encounter types across all characters in journal
+# Lists known encounter types across all aggregate characters in journal
 # This way, user can choose between known encounters or they can enter a new encounter type to be stored
 def list_encounter_types(rows: list[dict]) -> None:
     types = {r["encounter"].lower() for r in rows if r.get("algo") != "meta"}
@@ -192,6 +192,17 @@ def list_encounter_types(rows: list[dict]) -> None:
             print(f"- {t}")
         print()
 
+# Calculates average probability for a recorded Encounter Type across all aggregate characters in journal
+def avg_prob_for_type(rows: list[dict], encounter_type: str):
+    probs = [
+        float(r["probability"])
+        for r in rows
+        if r.get("encounter", "").lower() == encounter_type.lower()
+        and r.get("algo") != "meta"
+    ]
+    if not probs:
+        return None
+    return sum(probs) / len(probs)
 
 def clear_character(rows: list[dict], name: str) -> int:
     """
@@ -432,29 +443,53 @@ def main() -> None:
             if not name:
                 print("Name required.")
                 continue
-            enc_name = (
-                input("Encounter name (e.g., bear attack): ").strip() or "unspecified"
-            )
-            while True:
-                raw = input("Enter probability of surviving encounter (between 0 and 1, or 0%-100%):  ").strip()
-                try:
-                    p = parse_prob(raw)
-                    break
-                except ValueError as e:
-                    print(f"Invalid. Enter 0–1 or 0–100%. ({e})")
+                
+            # Enter encounter type 
+            enc_name = input("Encounter Type (e.g., bear attack): ").strip().lower()
+            if not enc_name:
+                 enc_name = "unspecified"
+
+            # Computer average probability for this encounter type
+            avg, count = avg_prob_for_type(rows, enc_name)
+
+            if avg is not None:
+                print(f"Based on {count} previous '{enc_name}' encounters,")
+                print(f"estimated survival chance = {avg*100:.1f}%")
+
+                proceed = input("Proceed? (y/n): ").strip().lower()
+                if proceed != 'y':
+                    print("Encounter Cancelled.")
+                    continue
+
+                # Generate final probability within ±10% of known average for type
+                lower = max(0.0, avg - 0.10)
+                upper = min(1.0, avg + 0.10)
+                final_prob = random.uniform(lower, upper)
+
+            else:
+                print(f"No previous data for '{enc_name}'.")
+                proceed = input("Proceed? (y/n): ").strip().lower()
+                if proceed != "y":
+                    print("Encounter Cancelled.")
+                    continue
+
+                # Generate fully random probability for new type
+                final_prob = random.uniform(0.0, 1.0)
+
+            # Store Encounter
             ts = datetime.now().isoformat(timespec="seconds")
             rows.append(
                 {
                     "timestamp": ts,
                     "character": name,
                     "encounter": enc_name,
-                    "probability": f"{p:.6f}",
+                    "probability": f"{final_prob:.6f}",
                     "algo": "basic",
                     "note": "",
                 }
             )
             save_csv_to_encrypted(password, rows)
-            print("Entry saved.")
+            print(f"Entry saved. Probability = {final_prob*100:.1f}%.")
 
         elif choice == "e": # List known encounter types
             list_encounter_types(rows)

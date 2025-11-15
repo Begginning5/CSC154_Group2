@@ -116,21 +116,21 @@ def save_csv_to_encrypted(password: str, rows: list[dict]) -> None:
 
 def cumulative_for_character(rows: list[dict], name: str) -> float:
     """
-    Compute product of probabilities for the specified character
-    using ONLY the persisted (decrypted) rows.
+    Calculates the character's overall survival score by multiplying the probabilities of all their past encounters.
+
+    This represents an "HP-style" survival meter: each logged encounter reduces total survival proportionally based on its
+    probability result.
     """
-    # PROBLEM 1 - This function calculates the probability that the character is still alive after all encounter
-    # probabilities are multiplied together. This means that the probability shrinks smaller toward 0 with each encounter.
-    # So in its current form, the "probability" left over functions more like an HP bar than a probability score.
-    # To align the program with the user stories, the code should be able to:
-    # 1) Calculate the survival probability of a specific type of encounter
-    # 2) Provide a basic choice for the user to decide between different options or strategies
-    # 3) Show the survival % (HP) that the character has remaining afterward (this will be the new use of the current 'probability score' function)
     vals = [float(r["probability"]) for r in rows if r["character"] == name]
     return prod(vals) if vals else 1.0
 
 def hp_bar(hp: float, width: int=20) -> str:
-    # Accepts HP between 0 and 1 written as a decimal (Example: .1 for 10%)
+    """
+    Returns a color-coded HP bar based on a decimal HP value.
+    hp: A float between 0 and 1 (e.g. 0.75 = 75% HP)
+    width: Total width of the bar display
+    """
+    # Determines how much of the bar is full vs empty
     filled = int(hp * width)
     empty = width - filled
 
@@ -140,9 +140,9 @@ def hp_bar(hp: float, width: int=20) -> str:
     red = "\033[91m"
     reset = "\033[0m"
 
-    if hp > 0.6:
+    if hp >= 0.6:
         color = green
-    elif hp > 0.3:
+    elif hp >= 0.3:
         color = yellow
     else:
         color = red
@@ -180,10 +180,13 @@ def print_history(rows: list[dict], name: str) -> None:
     hp = cumulative_for_character(rows, name)
     print(f"{name.upper():10} {hp_bar(hp)}")
 
-# Lists known encounter types across all aggregate characters in journal
-# This way, user can choose between known encounters or they can enter a new encounter type to be stored
 def list_encounter_types(rows: list[dict]) -> None:
+    """
+    Print all unique encounter types recorded across all characters.
+    """
+    # Collect all encounter names 
     types = {r["encounter"].lower() for r in rows if r.get("algo") != "meta"}
+    
     if not types:
         print("No encounter types logged yet.")
     else:
@@ -192,8 +195,11 @@ def list_encounter_types(rows: list[dict]) -> None:
             print(f"- {t}")
         print()
 
-# Calculates average probability for a recorded Encounter Type across all aggregate characters in journal
 def avg_prob_for_type(rows: list[dict], encounter_type: str):
+    """
+    Calculates average survival probability of a specific Encounter Type.
+    Returns average probability and number of instances of the Encounter Type.
+    """
     probs = [
         float(r["probability"])
         for r in rows

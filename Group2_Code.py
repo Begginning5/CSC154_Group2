@@ -133,7 +133,21 @@ def hp_bar(hp: float, width: int=20) -> str:
     # Accepts HP between 0 and 1 written as a decimal (Example: .1 for 10%)
     filled = int(hp * width)
     empty = width - filled
-    bar = f"[{'█' * filled}{'░' * empty}] {hp * 100:.1f}%"
+
+    # Colors - HP bar changes color depending on how full or low it is
+    green = "\033[92m"
+    yellow = "\033[93m"
+    red = "\033[91m"
+    reset = "\033[0m"
+
+    if hp > 0.6:
+        color = green
+    elif hp > 0.3:
+        color = yellow
+    else:
+        color = red
+    
+    bar = f"{color}[{'█' * filled}{'░' * empty}]{reset} {hp * 100:.1f}%"
     return bar
 
 def total_survival(rows: list[dict]) -> float:

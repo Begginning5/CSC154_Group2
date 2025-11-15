@@ -180,6 +180,18 @@ def print_history(rows: list[dict], name: str) -> None:
     hp = cumulative_for_character(rows, name)
     print(f"{name.upper():10} {hp_bar(hp)}")
 
+# Lists known encounter types across all characters in journal
+# This way, user can choose between known encounters or they can enter a new encounter type to be stored
+def list_encounter_types(rows: list[dict]) -> None:
+    types = {r["encounter"].lower() for r in rows if r.get("algo") != "meta"}
+    if not types:
+        print("No encounter types logged yet.")
+    else:
+        print("\nKnown Encounter Types:")
+        for t in sorted(types):
+            print(f"- {t}")
+        print()
+
 
 def clear_character(rows: list[dict], name: str) -> int:
     """
@@ -381,6 +393,7 @@ def main() -> None:
     App entrypoint: open/create the encrypted journal, ensure first-run profile,
     then run a simple menu so the user can:
       - Add an encounter (validate prob; save encrypted)
+      - List known encounter types (user can choose from known encounter type or enter new encounter type)
       - List a characters history with running total
       - Clear a characters entries
       - Change the journal password (re-encrypt in place)
@@ -409,7 +422,7 @@ def main() -> None:
 
     while True:
         print(
-            "\nMenu: [A]dd Encounter  [L]ist History  [N]ames  [S]ummary  "
+            "\nMenu: [A]dd Encounter [E]ncounter Types  [L]ist History  [N]ames  [S]ummary  "
             "[C]lear Character  [P]asswd Change  [R]eset Journal  [Q]uit"
         )
         choice = input("> ").strip().lower()
@@ -443,6 +456,9 @@ def main() -> None:
             save_csv_to_encrypted(password, rows)
             print("Entry saved.")
 
+        elif choice == "e": # List known encounter types
+            list_encounter_types(rows)
+            
         elif choice == "l":  # List history
             name = input("Character to list: ").strip()
             print_history(rows, name)

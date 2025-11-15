@@ -129,6 +129,12 @@ def cumulative_for_character(rows: list[dict], name: str) -> float:
     vals = [float(r["probability"]) for r in rows if r["character"] == name]
     return prod(vals) if vals else 1.0
 
+def hp_bar(hp: float, width: int=20) -> str:
+    # Accepts HP between 0 and 1 written as a decimal (Example: .1 for 10%)
+    filled = int(hp * width)
+    empty = width - filled
+    bar = f"[{'█' * filled}{'░' * empty}] {hp * 100:.1f}%"
+    return bar
 
 def total_survival(rows: list[dict]) -> float:
     """
@@ -156,6 +162,9 @@ def print_history(rows: list[dict], name: str) -> None:
         enc = r.get("encounter", "")[:20]
         print(f"{r['timestamp']:20s}  {enc:20s}  {p:0.3f}   {running:0.3f}")
     print(f"Overall: {running:0.3f}\n")
+    # Print HP bar 
+    hp = cumulative_for_character(rows, name)
+    print(f"{name.upper():10} {hp_bar(hp)}")
 
 
 def clear_character(rows: list[dict], name: str) -> int:

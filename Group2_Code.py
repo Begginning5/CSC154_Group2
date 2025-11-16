@@ -1,17 +1,3 @@
-# This is the running effort for the document.
-# print("Hello Group2")
-# print("Welcome To Wk4")
-
-# To run this code access terminal from the menu in GitHub.
-# To do this first click on "Code Spaces" in the Navigation Bar
-# Add you edits there.
-# In the GitHub Terminal type: python3 Group2_Code.py
-# This is the difficult part:
-# to save your changes to GitHub you will need to use the following commands:
-# git add .
-# git commit -m "Your Message Here"
-# git push
-
 # ── Group2_Code.py — Encrypted Probability Journal (CLI) ──
 # Logs encounters with a success probability, stores history as CSV text,
 # and keeps it encrypted on disk (journal.enc) using a password.

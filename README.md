@@ -39,13 +39,14 @@ session.</p>
       </ol>
     <li>Database</li>
       <ol>
-        <li>Registration Database</li>
+        <li>Encounter Database</li>
+        <li>Character Database</li>
         <li>User Content Database</li>
       </ol>
     <li>Top-level Classes</li>
       <ol>
         <li>User Class</li>
-        <li>Journal Class</li>
+        <li>Encounter Class</li>
       </ol>
     <li>Data Flow and States</li>
       <ol>
